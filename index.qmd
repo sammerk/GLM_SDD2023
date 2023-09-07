@@ -33,16 +33,22 @@ library(sjPlot)
 
 
 ## Herzlich Willkommen!
-::: {.callout-note}
-## Wer bin ich?
+
+::: {.callout-tip icon=false}
+## {{< bi dropbox color=#20c997 >}} Materialien
+Alle Materialien unter **https://bit.ly/merk111**
+:::
+
+::: {.callout-tip icon=false}
+## {{< bi easel2 color=#20c997 >}} Wer bin ich?
 * Samuel Merk
 * Professor für empirische Schul- und Unterrichtsforschung
 * Interessiert an evidenzinformierter Schul- und Unterrichtsentwicklung
 * Open Science Enthusiast
 :::
 
-::: {.callout-note}
-## Wer seid ihr?
+::: {.callout-tip icon=false}
+## {{< bi person-fill color=#20c997 >}} Wer seid ihr?
 * Inhaltliche Interessen
 * Stand der Qualifikation
 * Vorerfahrung Statistik
