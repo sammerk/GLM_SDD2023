@@ -1,0 +1,687 @@
+---
+title: "One Model to Rule Them All!"
+author: "Samuel Merk"
+lang: de
+format: 
+  html:
+    self-contained: true
+    toc: true
+theme:
+  light: flatly
+  dark: darkly
+editor_options: 
+  chunk_output_type: console
+bibliography: references.bib
+csl: apa.csl
+---
+```{r}
+#| label: setup-chunk
+#| echo: false
+#| results: hide
+#| warning: false
+#| message: false
+library(tidyverse)
+library(bayestestR)
+library(faux)
+library(hrbrthemes)
+library(haven)
+library(plotly)
+library(modelsummary)
+library(lavaan)
+library(sjPlot)
+```
+
+
+## Herzlich Willkommen!
+::: {.callout-note}
+## Wer bin ich?
+* Samuel Merk
+* Professor für empirische Schul- und Unterrichtsforschung
+* Interessiert an evidenzinformierter Schul- und Unterrichtsentwicklung
+* Open Science Enthusiast
+:::
+
+::: {.callout-note}
+## Wer seid ihr?
+* Inhaltliche Interessen
+* Stand der Qualifikation
+* Vorerfahrung Statistik
+    * Workshops
+    * Modelle (t-Test, ANOVA, ...)
+    * Software
+* Warum habt ihr den Workshop gewählt?    
+:::
+
+## Masterplan
+* Korrelation
+* Regression
+    * Einfache lineare Regression (LM)
+    * Multiple lineare Regression
+* Generalized Linear Models (GLM)
+    * Logistische Regression
+    * Poisson Regression
+
+
+## Zum Modus des Workshops
+::: {.callout-important icon=false}
+## {{< bi heartbreak color=#e74c3c >}} Was können wir (nicht) vom Workshop erwarten?
+Typischerweise erwartet »man« zu viel von einem Workshop wie diesem. Niemand wird nach 3,5 Stunden das GLM beherrschen.  
+Jedoch müssen alle irgendwo & irgendwie anfangen. Der Workshop soll für viele die Gelegenheit bieten Anstoß für eigene Elaborationen zu finden.
+:::
+
+::: {.callout-tip icon=false}
+## {{< bi lightbulb color=#20c997 >}} Wie maximiere ich meinen Lernerfolg?
+M.E. am besten mit möglichst aktiver Elaboration. Wenn man gerade unterfordert ist, erklärt man den Inhalt seiner Kollegin und wenn man gerade überfordert ist bittet man die Kollegin um eine Erklärung.
+:::
+
+## Block I: Grundbegriffe
+::: {.callout-warning icon=false}
+## {{< bi question-circle color=#e74c3c >}} Kontrastiert und vergleicht die folgenden Begriffsets und eleboriert mit euren Partnern Beispiele aus eurer eigenen Forschung 
+
+* Korrelation, Kausalität, Regression
+* Inferenzstatistik, Deskriptivstatistik, Effektstärken
+* Signifikanz, p-Werte, $\alpha$-Niveau
+:::
+
+::: {.callout-tip icon=false collapse=true}
+## {{< bi lightbulb color=#20c997 >}} Lösungshilfen
+> **Korrelationen** beschrieben die Koinzidenz von bivariat-normalverteilter Daten/Variablen. Von kausaler Relationierung zweier Variablen spricht man, wenn  wenn die *Veränderung* einer Variable  einer *Änderung der anderen Variable* induziert. Zwei kausal relationierte Variablen korrelieren nicht immer. Zwei korrelierende Variablen sin dnicht immer kausal relationiert.
+
+> **Inferenzstatistik** macht Aussagen über den stochastischen Prozess der ein vorliegenden Datensatz generiert. Typischerweise werden dabei Hypothesen getestet oder die Unsicherheit einer Parameterschätzung quantifiziert. **Deskriptivstatistik** macht Aussagen über einen Datensatz. **Effektstärken** (z.B. Cohen's *d*) können Deskriptivstatistiken sein. Konfidenz- oder Credibilityintervalle von Effektstsärken stellen allerdings Infernezstatistiken dar.
+
+> **p-Werte** quantifizieren die Wahrscheinlichkeit vorliegende (oder extremer gegen die Nullhypothese sprechende Daten) zu erhalten unter der Annahme, dass die Nullhypothese wahr ist. Fällt diese Wahrscheinlicheit und eine a priori festegelegte Irrtumswahrscheinlichkeit **$\alpha$** spricht man von **Signifikanz**.
+:::
+
+## Block II: Korrelation
+### Warm-Up Aufgaben
+
+::: {.callout-warning icon=false}
+## {{< bi question-circle color=#e74c3c >}} Interpretationsaufgaben
+
+```{r}
+#| echo: false
+#| results: hide
+#| label: data prep corr
+#| message: false
+#| cache: true
+
+set.seed(9)
+uv <- round(distribution_normal(500, 150, 50), 0)
+av <- rnorm_pre(uv, 60, 20, .878)
+
+data_lesen <- 
+  tibble(`Förderungsdauer [h]` = uv,
+         Dauer = uv,
+         `Zuwachs in Lesetest [Punkte]` = av,
+         Lesetest = av)
+cor(data_lesen$`Förderungsdauer [h]`, data_lesen$`Zuwachs in Lesetest [Punkte]`)
+write_sav(data_lesen |> select(Dauer, Lesetest), 
+          "data/data_corr_lesen.sav")
+
+data_schoko <- 
+  read_csv("https://fabiandablander.com/assets/data/nobel-chocolate.csv") |> 
+    mutate(`Schokoladenkonsum pro Einwohner pro Jahr in kg` = Chocolate,
+           `Nobelpreise pro 10 Millionen Einwohner*innen` = Laureates10_million)
+cor(data_schoko$Chocolate, data_schoko$Laureates10_million)
+write_sav(data_schoko |> select(Chocolate, Laureates10_million), 
+          "data/data_corr_schoko.sav")
+```
+
+
+Angenommen `r xfun::embed_file("data/data_corr_lesen.sav", "data_corr_lesen.sav", "die folgenden Daten")` stellen das Ergebnis eines Lesetests dar, in Abhängigkeit des Umfangs einer Leseförderung, die randomisiert unterschiedlich lange ausgebracht wurde. Was sagen diese Daten aus?
+```{r}
+#| echo: false
+#| label: intervention lesförderung
+#| fig-width: 4.5
+#| fig-height: 4.5
+#| out-width: 33%
+#| cache: true
+#| message: false
+#| fig-align: left
+
+
+plot <- 
+  ggplot(
+  data_lesen,
+  aes(`Förderungsdauer [h]`, `Zuwachs in Lesetest [Punkte]`)
+) +
+  geom_point(shape = 1, color = "#8cd000") +
+  geom_rug(color = "#8cd000",
+           alpha = .4) +
+  theme_modern_rc() +
+  labs(
+    title = "Assoziation", 
+    subtitle = "von Förderungsdauer & -erfolg") +
+    stat_smooth(method = "lm", 
+                se = F, 
+                color = "#8cd000")
+plot
+```
+
+
+`r xfun::embed_file("data/data_corr_schoko.sav", "data_corr_schoko.sav", "Die nächsten Daten")` beschreiben die Anzahl der Nobelpreise und die durschnittliche Menge gegessener Schokolade in einer Reihe von Ländern. Was sagen diese Daten aus?
+
+```{r}
+#| echo: false
+#| label: schokoladenplot
+#| fig-width: 4.5
+#| fig-height: 4.5
+#| out-width: 33%
+#| fig-align: left
+#| cache: true
+#| message: false
+
+
+ggplot(
+  data_schoko,
+  aes(`Schokoladenkonsum pro Einwohner pro Jahr in kg`,
+      `Nobelpreise pro 10 Millionen Einwohner*innen`)) +
+  geom_point(shape = 1, color = "#8cd000") +
+  geom_rug(color = "#8cd000",
+           alpha = .4) +
+  theme_modern_rc() +
+  labs(
+    title = "Assoziation", 
+    subtitle = "von Schokoladenkonsum & Anzahl Nobelpreisen") +
+    stat_smooth(method = "lm", 
+                se = F, 
+                color = "#8cd000")
+```
+
+:::
+
+::: {.callout-warning icon=false}
+## {{< bi question-circle color=#e74c3c >}} Datenaufgabe
+* Berechnet die Korrelationen und 
+* testet diese auf die Nullhypothese $H_0: \; r = 0$ mit einem p-Wert oder Bayes Factor
+:::
+
+### Definitionen
+Die Pearson Korrelation ist wie folgt definiert:
+
+$$r_{x, y}=\frac{\sum_{i=1}^n\left(x_i-\bar{x}\right)\left(y_i-\bar{y}\right)}{\sqrt{\sum_{i=1}^n\left(x_i-\bar{x}\right)^2 \sum_{i=1}^n\left(y_i-\bar{y}\right)^2}} = \frac{Cov(x,y)}{s_x \cdot s_y} = Cov(x,y) \cdot \frac{1}{s_x} \cdot \frac{1}{s_y}$$
+
+In der folgenden dynamischen Visualisierung kann man sehen, dass die Kovarianz der »gerichteten Fläche« entspricht:
+
+<iframe scrolling="no"
+src="https://www.geogebra.org/material/iframe/id/xj3vvgvp/szb/true/smb/false/sfsb/true/sri/true"
+width="523px"
+height="540px"
+style="border:0px;" allowfullscreen>
+</iframe>
+
+Da die Kovarianz aber von der Maßeinheit der Größen abhängt wird diese durch die Standardabweichung beider Größen geteilt.
+
+:::: {.columns}
+
+::: {.column width='50%'}
+```{r}
+#| fig-width: 6.5
+#| fig-height: 4.5
+#| out-width: 100%
+#| fig-align: center
+#| cache: true
+#| echo: false
+#| message: false
+#| warning: false
+
+plot +
+  # Errorbarmargin UV
+  geom_segment(aes(x = mean(uv) - sd(uv), 
+                   xend = mean(uv) + sd(uv),
+                   y = min(av) - 6,
+                   yend = min(av) - 6),
+               color = "#d77d00") + 
+  geom_point(data =tibble(`Förderungsdauer [h]` = mean(uv),
+                          `Zuwachs in Lesetest [Punkte]` = min(av) - 6),
+             aes(`Förderungsdauer [h]`, `Zuwachs in Lesetest [Punkte]`),
+             color = "#d77d00") +
+#  annotate("text", x = mean(uv), 
+#           y = min(av) -.5, 
+#           label = "MW ± 1*SD",
+#           color = "#d77d00",
+#           size = 3) +
+  # Errorbarmargin aV
+  geom_segment(aes(y = mean(av) - sd(av), 
+                   yend = mean(av) + sd(av),
+                   x = min(uv) - 4,
+                   xend = min(uv) - 4),
+               color = "#d77d00") +
+  geom_point(data = tibble(`Förderungsdauer [h]` = min(uv) - 4,
+                           `Zuwachs in Lesetest [Punkte]` = mean(av)),
+           aes(`Förderungsdauer [h]`, `Zuwachs in Lesetest [Punkte]`),
+           color = "#d77d00") +
+ # annotate("text", x = min(uv), 
+ #          y = mean(av), 
+ #          label = "MW ± 1*SD",
+ #          color = "#d77d00",
+ #          size = 2.5,
+ #          angle = -90) +
+  # Steigungsdreieck
+  geom_segment(aes(y = mean(av), 
+                   yend = mean(av),
+                   x = mean(uv),
+                   xend = mean(uv) + sd(uv)),
+               color = "#d77d00") +
+  geom_segment(aes(y = mean(av), 
+                 yend = mean(av) + cor(av, uv)*sd(av),
+                 x = mean(uv) + sd(uv),
+                 xend = mean(uv) + sd(uv)),
+             color = "#d77d00") +
+  # Hilfslinien
+  geom_segment(aes(x = mean(uv),
+                   xend = mean(uv)),
+                   y = min(av) - 6, 
+                   yend = mean(av),
+               color = "#d77d00",
+               alpha = .1,
+               linetype = 3) +
+  geom_segment(aes(x = mean(uv) + sd(uv),
+                   xend = mean(uv) + sd(uv),
+                   y = min(av) - 6, 
+                   yend = mean(av)),
+               color = "#d77d00",
+               alpha = .1,
+               linetype = 3) +
+    geom_segment(aes(x = min(uv) - 3,
+                   xend = mean(uv),
+                   y = mean(av), 
+                   yend = mean(av)),
+               color = "#d77d00",
+               alpha = .1,
+               linetype = 3) +
+     geom_segment(aes(x = min(uv) - 3,
+                   xend = mean(uv) + sd(uv),
+                   y = mean(av) + cor(av, uv)*sd(av), 
+                   yend = mean(av) + cor(av, uv)*sd(av)),
+               color = "#d77d00",
+               alpha = .1,
+               linetype = 3) +
+  stat_smooth(method = "lm", 
+              se = F, 
+              color = "#8cd000") +
+  theme(axis.text = element_blank()) +
+  xlab("Förderdauer [Minuten]")
+```
+
+:::
+
+::: {.column width='50%'}
+```{r}
+#| fig-width: 3.5
+#| fig-height: 4.5
+#| out-width: 52%
+#| fig-align: center
+#| echo: false
+#| message: false
+#| warning: false
+#| cache: true
+
+plot +
+  # Errorbarmargin UV
+  geom_segment(aes(x = mean(uv) - sd(uv), 
+                   xend = mean(uv) + sd(uv),
+                   y = min(av) - 6,
+                   yend = min(av) - 6),
+               color = "#d77d00") + 
+  geom_point(data =tibble(`Förderungsdauer [h]` = mean(uv),
+                          `Zuwachs in Lesetest [Punkte]` = min(av) - 6),
+             aes(`Förderungsdauer [h]`, `Zuwachs in Lesetest [Punkte]`),
+             color = "#d77d00") +
+ # annotate("text", x = mean(uv), 
+ #          y = min(av) -.5, 
+ #          label = "MW ± 1*SD",
+ #          color = "#d77d00",
+ #          size = 3) +
+  # Errorbarmargin aV
+  geom_segment(aes(y = mean(av) - sd(av), 
+                   yend = mean(av) + sd(av),
+                   x = min(uv) - 4,
+                   xend = min(uv) - 4),
+               color = "#d77d00") +
+  geom_point(data = tibble(`Förderungsdauer [h]` = min(uv) - 4,
+                           `Zuwachs in Lesetest [Punkte]` = mean(av)),
+           aes(`Förderungsdauer [h]`, `Zuwachs in Lesetest [Punkte]`),
+           color = "#d77d00") +
+ # annotate("text", x = min(uv), 
+ #          y = mean(av), 
+ #          label = "MW ± 1*SD",
+ #          color = "#d77d00",
+ #          size = 2.5,
+ #          angle = -90) +
+  # Steigungsdreieck
+  geom_segment(aes(y = mean(av), 
+                   yend = mean(av),
+                   x = mean(uv),
+                   xend = mean(uv) + sd(uv)),
+               color = "#d77d00") +
+  geom_segment(aes(y = mean(av), 
+                 yend = mean(av) + cor(av, uv)*sd(av),
+                 x = mean(uv) + sd(uv),
+                 xend = mean(uv) + sd(uv)),
+             color = "#d77d00") +
+  # Hilfslinien
+  geom_segment(aes(x = mean(uv),
+                   xend = mean(uv)),
+                   y = min(av) - 6, 
+                   yend = mean(av),
+               color = "#d77d00",
+               alpha = .1,
+               linetype = 3) +
+  geom_segment(aes(x = mean(uv) + sd(uv),
+                   xend = mean(uv) + sd(uv),
+                   y = min(av) - 6, 
+                   yend = mean(av)),
+               color = "#d77d00",
+               alpha = .1,
+               linetype = 3) +
+    geom_segment(aes(x = min(uv) - 3,
+                   xend = mean(uv),
+                   y = mean(av), 
+                   yend = mean(av)),
+               color = "#d77d00",
+               alpha = .1,
+               linetype = 3) +
+     geom_segment(aes(x = min(uv) - 3,
+                   xend = mean(uv) + sd(uv),
+                   y = mean(av) + cor(av, uv)*sd(av), 
+                   yend = mean(av) + cor(av, uv)*sd(av)),
+               color = "#d77d00",
+               alpha = .1,
+               linetype = 3) +
+  stat_smooth(method = "lm", 
+              se = F, 
+              color = "#8cd000") +
+  theme(axis.text = element_blank())
+```
+
+:::
+
+::::
+
+
+
+#### Eigenschaften Pearson's $r$  {.center}
+::: {.incremental}
+* Pearson's $r$  beschreibt die Stärke der (negativen oder positiven) Assoziation zweier bivariat normalverteilten Variablen
+* Pearson's $r$  nimmt Werte zwischen -1 und 1 an $(-1 \leq r \leq 1)$. -1 impliziert die maximale negative Assoziation, 0 keine Assoziation und 1 die maximale positive Assoziation
+* Nach Cohen [-@cohen1988], gilt $r =.1$ (bzw. $r = -.1$) als kleiner Effekt, $r =.3$ (bzw. $r = -.3$) als moderater und $r =.5$ (bzw. $r = -.5$) als starker Effekt
+:::
+
+#### Visual Guessing Pearson's $r$ {.center}
+Meiner Erfahrung nach ist es höchst sinnvoll Effektstärken in Grafiken überstezen zu können und umgekehrt. Um dies zu lernen kann die folgende handgestrickte App dienen.
+```{r}
+#| echo: false
+knitr::include_url("https://sammerk.shinyapps.io/Visual_Guessing_r/", 
+                   height = "850px")
+```
+
+
+## Block III: Regression
+### Einfache lineare Regression
+#### Bsp: Lernstunden vs. Lernerfolg
+```{r}
+#| echo: false
+#| message: false
+#| cache: true
+
+klausur_data <- tibble(Vorbereitungsaufwand = c(18,26,46,42,20,26,38,34,40,30,24,14,44,10,28,28,36,16,50,24,36,32,34,22,32),
+                       Punkte = c(21,22,37,30,19,25,32,32,30,22,26,19,29,13,27,21,25,16,33,17,28,23,26,23,29))                
+
+  ggplot(klausur_data, aes(x = Vorbereitungsaufwand, y = Punkte)) + 
+    geom_point(color = "#8cd000") + 
+    stat_smooth(method = "lm", se = F, color = "#8cd000") +
+    labs(title = "Vorbereitungsaufwand & Klausurpunkte", subtitle = "Daten aus Eid, Gollwitzer und Schmitt (2015)") + 
+    theme_modern_rc()
+
+```
+
+#### Parametrisierung
+* Darstellung als Formel (Term)
+     * Typische Schreibweise: $y_i = b_0 + b_1 \cdot x_i + \epsilon_i$
+     * Generalisierte Schreibweise: $y_i \sim \mathcal{N}(\mu,\,\sigma^{2})$ mit $\mu = b_0 + b_1 \cdot x_i$
+     * Datenbeispiel: $\text{Punkte}_i = 10 + 0,5 \cdot \text{Vorbereitungsaufwand}_i + \epsilon_i$
+* Darstellung als Pfadmodell  
+```{r, echo = F, out.width="60%"}
+knitr::include_graphics("img/Reg_Pfad_tikz.png")
+```
+
+
+#### Parameterschätzung
+```{r}
+#| echo: false
+#| cache: true
+knitr::include_url("https://www.geogebra.org/material/iframe/id/wDpDdS7g/width/1600/height/715/border/888888/rc/false/ai/false/sdz/false/smb/false/stb/false/stbh/true/ld/false/sri/false")
+```
+
+
+#### Effektstärke $\beta_1$
+<iframe scrolling="no"
+src="https://www.geogebra.org/material/iframe/id/mR3kx7Fm/width/3000/height/1500/rc/false" width=1200px" height="450px" style="border:0px;" allowfullscreen>
+</iframe>
+
+
+#### Effektstärke $R^2$
+<iframe scrolling="no"
+src="https://www.geogebra.org/material/iframe/id/zwhdveyz/width/2200/height/900/" width="1200px" height="450px" style="border:0px;" allowfullscreen>
+</iframe>
+
+
+::: {.callout-warning icon=false}
+## {{< bi question-circle color=#e74c3c >}} Übung: Einfache lineare Regression
+`r xfun::embed_file("data/klausur_data_m.sav", "klausur_data_m.sav", text = "Diese Datei ")` enthält die Klausurdaten aus dem Beispiel oben. 
+
+**Basisaufgabe:**
+
+* Bestimmt die standardisierten und unstandardisierten Regressionskoeffizienten sowie $R^2$ und interpretiert sie.
+
+**Vertiefungsaufgaben**
+
+* Schätzt die Parameter in einem bayesianischen Framework mit `{brms}` und vergleicht Konfidenz mit Credibilityintervallen
+* Berechnet einen Bayes Factor  via `BayesFactor` der das Modell mit Prädiktor mit einem Modell ohne Prädiktor vergleicht
+
+:::
+
+
+### Multiple Regression
+* Typische Schreibweise: $y_i = b_0 + b_1 \cdot x_{1i} + b_2 \cdot x_{2i} + \dots + b_j \cdot x_{ji} + \epsilon_i$
+* Generalisierte Schreibweise: $y_i \sim \mathcal{N}(\mu,\,\sigma^{2})$ mit $\mu = b_0 + b_1 \cdot x_{1i} + b_2 \cdot x_{2i} + \dots + b_j \cdot x_{ji}$
+* Datenbeispiel: $\text{Punkte}_i = -0,13 + 0,52 \cdot \text{Vorbereitungsaufwand}_i + 0,38 \cdot \text{Pruefungsangst}_i + \epsilon_i$
+* Darstellung als Pfadmodell  
+```{r, echo = F, out.width="60%", cache=TRUE}
+knitr::include_graphics("img/mult_Reg_Pfad_tikz.png")
+```
+    
+* Geometrische Darstellung
+
+```{r, echo = F, fig.height=4, message=F, out.height= "500px", warning=FALSE, eval=FALSE, cache=TRUE}
+library(tidyverse)
+library(plotly)
+
+klausur_data_m <- tibble(Vorbereitungsaufwand = c(34,29,20,35,45,29,46,49,21,36,42,23,12,28,33,25,47,
+                                                17,31,31,21,24,22,26,40,37,33,12,22,31,28,15,28,27,
+                                                25,13,25,28,11,50,31,40,11,11,38,39,50,22,37,11),
+                       Pruefungsangst = c(4,4,5,10,7,6,6,3,1,9,7,7,6,1,1,3,6,3,9,2,8,3,2,6,9,8,8,1,1,
+                                       3,4,4,9,2,9,5,3,8,9,1,1,1,10,9,4,4,8,1,10,8),
+                       Punkte = c(23,10,11,19,25,16,24,29,20,21,31,20,11,12,13,13,24,7,19,4,8,16,
+                                  11,8,26,21,27,7,15,14,22,10,19,14,17,16,15,16,11,30,12,20,8,8,
+                                  24,21,31,12,19,5))               
+
+library(reshape2)
+lm_mod <- lm(Punkte ~ Vorbereitungsaufwand + Pruefungsangst,data =klausur_data_m)
+
+#Graph Resolution (more important for more complex shapes)
+graph_reso <- 0.05
+
+#Setup Axis
+axis_x <- seq(min(klausur_data_m$Vorbereitungsaufwand), max(klausur_data_m$Vorbereitungsaufwand), by = graph_reso)
+axis_y <- seq(min(klausur_data_m$Pruefungsangst), max(klausur_data_m$Pruefungsangst), by = graph_reso)
+
+#Sample points
+Regressionsebene <- expand.grid(Vorbereitungsaufwand = axis_x,Pruefungsangst = axis_y,KEEP.OUT.ATTRS = F)
+Regressionsebene$Punkte <- predict.lm(lm_mod, newdata = Regressionsebene)
+Regressionsebene <- acast(Regressionsebene, Pruefungsangst ~ Vorbereitungsaufwand, value.var = "Punkte") #y ~ x
+
+klausur_plotly <- 
+  plot_ly(klausur_data_m
+       )%>%
+  add_trace( x = ~Vorbereitungsaufwand, 
+        y = ~Pruefungsangst, 
+        z = ~Punkte,
+        type = "scatter3d", 
+        mode = "markers",
+        marker = list(size = 2, color = "#37414b", symbol = 104))%>%
+  add_surface(z = ~Regressionsebene,
+              x = ~axis_x,
+              y = ~axis_y,
+              opacity = 0.8,
+              colorscale = list("#a51e41"),
+              contours = list(x = list(highlight = F),
+                              y = list(highlight = F),
+                              z = list(highlight = F)))%>%
+  #add_trace(x = c(5,10), y = c(5,10), z = c(5,10), type = "scatter3d",  mode="lines",
+  #          line = list(color = "#a51e41", width = 4))%>%
+ layout(scene = list(xaxis = list(spikesides = T, showspikes = T),
+                     yaxis = list(spikesides = T, showspikes = T),
+                     zaxis = list(spikesides = T, showspikes = T)),
+        showlegend = F)
+
+htmlwidgets::saveWidget(klausur_plotly, "img/klausur_plotly/klausur_plotly.html")
+
+```
+
+<iframe src="img/klausur_plotly/klausur_plotly.html" width="700" height="400px" data-external="1"></iframe>
+
+::: {.callout-warning icon=false}
+## {{< bi question-circle color=#e74c3c >}} Aufgabe
+**Basisaufgabe**
+
+* Bestimmt die standardisierten und unstandardisierten Regressionskoeffizienten 
+ und interpretiert sie ebenso wie deren p-Werte.
+ 
+**Vertiefungsaufgabe**
+
+* Was sagen die Ergebnisse über die kausale Relation der Variablen aus?
+:::
+
+::: {.callout-tip icon=false collapse=true}
+## {{< bi lightbulb color=#20c997 >}} Lösung
+
+```{r}
+#| cache: true
+data_kl <- read_sav("data/klausur_data_m.sav")
+
+lm_kl01 <- lm(Punkte ~ Vorbereitungsaufwand , 
+              data = data_kl)
+summary(lm_kl01)
+
+lm_kl02 <- lm(Punkte ~ Vorbereitungsaufwand + Pruefungsangst, 
+              data = data_kl)
+summary(lm_kl02)
+```
+:::
+
+### Multiple Regression mit Dummyvariablen (a.k.a t-Test & ANOVA)
+#### Beispieldaten
+```{r}
+#| echo: false
+#| results: hide
+#| label: data prep STAR
+#| message: false
+data_star <- read_sav("data/star_math3_per_class.sav")
+```
+
+Als `r xfun::embed_file("data/star_math3_per_class.sav", "star_math3_per_class.sav", "Datengrundlage")` sollen auf Klassenebene aggregierte Leistungswerte in Mathematik aus dem STAR-Projekt dienen. Sie untersuchen die Effekte einer Klassengrößenreduktion bzw. Hilfslehrkraft [@achilles1985].
+
+```{r}
+#| echo: false
+data_star |> 
+  head() |> 
+  knitr::kable()
+```
+
+Ein Modell $Mathescore_i \sim \mathcal{N}(\mu,\,\sigma^{2})$ mit $\mu = b_0 + b_1 \cdot regsizeplusaid_{i} + b_2 \cdot regsize_{i}$ beschreibt die beiden Mittelwertsdifferenzen der Gruppen »kleine Klasse« und »reguläre Klasse« sowie »kleine Klasse« und »reguläre Klasse mit Hilfslehrkaft«.
+
+
+```{r}
+star_model01 <- lm(math_per_class ~ regsize, 
+                   data = data_star |> 
+                     filter(regsizeplusaid != 1))
+star_model02 <- lm(math_per_class ~ regsize + regsizeplusaid, 
+                   data = data_star)
+
+tab_model(star_model01, star_model02,
+          show.std = T)
+
+```
+
+
+
+
+## Block IV: Generalized Linear Models
+Ein verallgemeinertes lineares Modell umfasst typischerweise
+
+1) einen Datenvektor $y = (y_1, . . . , y_n)$
+2) Prädiktoren $\mathbf{X}$ und Koeffizienten $\beta$, die einen linearen Prädiktor $\mathbf{X}{\beta}$ bilden
+3) Eine Verknüpfungsfunktion $g$, die einen Vektor von transformierten Daten $\hat{y}=g^{-1}(\mathbf(X) \beta)$ ergibt, die zur Modellierung der Daten verwendet werden 
+4) Eine Datenverteilung $P(y)$ 
+5) Möglicherweise andere Parameter, wie Varianzen, »Überstreuungen« und Grenzwerte, die in die Prädiktoren, die Verknüpfungsfunktion und die Datenverteilung eingehen.
+
+### Beispiel logistische Regression
+Mit der logistischen Regression werden Binäre Daten (nominale Variablen mit zwei Ausprägungen) anhand von metrischen oder dummykodierten Variablen prädiziert. Dabei gilt:
+
+\begin{aligned}
+y_i & \sim \operatorname{Bernoulli(p_i)} \\
+\operatorname{logit}\left(p_i\right) & =X_i \beta
+\end{aligned}
+
+mit $\operatorname{logit}(x)=\log (x /(1-x))$.
+
+### Datenbeispiel
+```{r}
+#| echo: false
+#| results: hide
+data_poll_repub <- 
+  read_dta("data/polls.dta")
+```
+
+Als `r xfun::embed_file("data/polls.dta", "polls.dta", "Datengrundlage")` sollen hier über zehntausend Wählenrinnen dienen, die entwender beabsichtigten G. W. Bush zu wählen `bush = 1` oder nicht `bush = 0`. Diese binäre abhängige Variable kann dann mit den unabhängigen Variablen `edu`, `age`, `female` etc. prädiziert werden.
+
+```{r}
+#| cache: true
+data_poll_repub
+```
+
+
+```{r}
+#| message: false
+
+mod_poll01 <- 
+  glm(bush ~ age, 
+      family = binomial(link = "logit"),
+      data = data_poll_repub)
+summary(mod_poll01)
+
+mod_poll02 <- 
+  glm(bush ~ black, 
+      family = binomial(link = "logit"),
+      data = data_poll_repub)
+summary(mod_poll02)
+
+tab_model(mod_poll01, mod_poll02)
+```
+
+
+
+
+## Literatur
+
+<!--
+::: {.callout-warning icon=false}
+## {{< bi question-circle color=#e74c3c >}} 
+:::
+
+::: {.callout-tip icon=false collapse=true}
+## {{< bi lightbulb color=#20c997 >}} Lösungshilfen
+:::
+-->
