@@ -91,7 +91,7 @@ M.E. am besten mit möglichst aktiver Elaboration. Wenn man gerade unterfordert 
 
 ::: {.callout-tip icon=false collapse=true}
 ## {{< bi lightbulb color=#20c997 >}} Lösungshilfen
-> **Korrelationen** beschrieben die Koinzidenz von bivariat-normalverteilter Daten/Variablen. Von kausaler Relationierung zweier Variablen spricht man, wenn  wenn die *Veränderung* einer Variable  einer *Änderung der anderen Variable* induziert. Zwei kausal relationierte Variablen korrelieren nicht immer. Zwei korrelierende Variablen sin dnicht immer kausal relationiert.
+> **Korrelationen** beschreiben die Koinzidenz von bivariat-normalverteilten Daten/Variablen. Von kausaler Relationierung zweier Variablen spricht man, wenn  wenn die *Veränderung* einer Variable eine *Änderung der anderen Variable* induziert. Zwei kausal relationierte Variablen korrelieren nicht immer. Zwei korrelierende Variablen sind nicht immer kausal relationiert.
 
 > **Inferenzstatistik** macht Aussagen über den stochastischen Prozess der ein vorliegenden Datensatz generiert. Typischerweise werden dabei Hypothesen getestet oder die Unsicherheit einer Parameterschätzung quantifiziert. **Deskriptivstatistik** macht Aussagen über einen Datensatz. **Effektstärken** (z.B. Cohen's *d*) können Deskriptivstatistiken sein. Konfidenz- oder Credibilityintervalle von Effektstsärken stellen allerdings Infernezstatistiken dar.
 
